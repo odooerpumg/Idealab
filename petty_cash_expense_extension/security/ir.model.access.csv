@@ -1,0 +1,10 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_petty_cash_request,petty_cash_expense,model_petty_cash_expense,account.group_account_user,1,1,1,1
+access_petty_cash_approve,petty_cash_approve,model_petty_cash_approve,account.group_account_user,1,1,1,1
+access_expense_prepaid,expense_prepaid,model_expense_prepaid,account.group_account_user,1,1,1,1
+access_expense_prepaid_line,expense_prepaid_line,model_expense_prepaid_line,account.group_account_user,1,1,1,1
+access_expense_prepaid_account,expense_prepaid_account,model_expense_prepaid_account,account.group_account_user,1,1,1,1
+access_hr_expense_line,hr_expense_line,model_hr_expense_line,account.group_account_user,1,1,1,1
+access_account_transfer,account_transfer,model_account_transfer,account.group_account_user,1,1,1,1
+access_account_account_user,account_account_user,model_account_account,petty_cash_expense_extension.group_coa_user,1,0,0,0
+access_account_account_admin,account_account_admin,model_account_account,petty_cash_expense_extension.group_coa_admin,1,1,1,1

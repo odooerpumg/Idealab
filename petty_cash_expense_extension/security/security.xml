@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+	<data noupdate="0">
+
+	<!-- <record id="make_invisible" model="res.groups">
+		<field name="name">Show My Expense Report Menu</field>
+	</record>
+	<record model="ir.ui.menu" id="my_expense.menu_hr_expense_sheet_my_reports">
+		<field name="groups_id" eval="[(5,ref('make_invisible'))]"/>
+	</record> -->
+
+		<record id="module_petty_cash_access" model="ir.module.category">
+			<field name="name">Petty Cash</field>
+			<field name="sequence">8</field>
+			<field name="description">It will help you to request Petty Cash</field>
+		</record>
+
+		<record id="group_petty_user" model="res.groups">
+			<field name="name">Petty User</field>
+			<field name="category_id" ref="petty_cash_expense_extension.module_petty_cash_access"/>
+		</record>
+
+		<record id="group_petty_approver" model="res.groups">
+			<field name="name">Petty Approver</field>
+			<field name="category_id" ref="petty_cash_expense_extension.module_petty_cash_access"/>
+			<field name="implied_ids" eval="[(4, ref('petty_cash_expense_extension.group_petty_user'))]"/>
+		</record>
+
+		<record id="group_petty_user_group" model="ir.rule">
+			<field name="name">Petty User</field>
+			<field name="model_id" ref="model_petty_cash_expense"/>
+			<!-- <field name="domain_force">[('employee_id.user_id','=',user.id)]</field> -->
+			<field name="perm_create" eval="True"/>
+			<field name="perm_write" eval="False"/>
+			<field name="perm_unlink" eval="False"/>
+			<field name="perm_read" eval="True"/>
+			<field name="groups" eval="[(4,ref('petty_cash_expense_extension.group_petty_user'))]"/>
+		</record>
+		<!-- <record id="group_petty_approver_group" model="ir.rule">
+			<field name="name">Petty Approver</field>
+			<field name="model_id" ref="model_petty_cash_expense"/>
+			<field name="domain_force">[('state','in',('request','validate','refuse'))]</field>
+			<field name="perm_create" eval="False"/>
+			<field name="perm_write" eval="False"/>
+			<field name="perm_unlink" eval="False"/>
+			<field name="perm_read" eval="True"/>
+			<field name="groups" eval="[(4,ref('group_petty_approver'))]"/>
+		</record> -->
+
+	</data>
+
+</odoo>

@@ -1,0 +1,24 @@
+<odoo>
+	<data>
+		<record model="ir.ui.view" id="view_view_account_form_inherit">
+			<field name="name">account.account.form</field>
+			<field name="model">account.account</field>
+			<field name="inherit_id" ref="account.view_account_form"/>
+			<field name="arch" type="xml">
+				<xpath expr="//field[@name='user_type_id']" position="after">
+					<field name="bu_br_name" />
+				</xpath>
+			</field>
+		</record>
+		<record model="ir.ui.view" id="view_account_list_inherit">
+			<field name="name">account.account.form</field>
+			<field name="model">account.account</field>
+			<field name="inherit_id" ref="account.view_account_list"/>
+			<field name="arch" type="xml">
+				<xpath expr="//field[@name='user_type_id']" position="after">
+					<field name="bu_br_name" />
+				</xpath>
+			</field>
+		</record>
+	</data>
+</odoo>

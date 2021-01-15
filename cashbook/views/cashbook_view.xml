@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_cashbook_search" model="ir.ui.view">
+            <field name="name">cashbook.search</field>
+            <field name="model">account.cashbook</field>
+            <field name="arch" type="xml">
+                <search string="Filter">
+                    <field name="name" />
+                    <field name="ref_no" />
+                    <field name="cash_type" />
+                    <field name="date" />
+                    <field name="journal_id" />
+                    <field name="account_id" />
+                    <field name="currency_id" />
+                    <group expand="0" string="Group By">
+                        <filter name="account_id" string="Account" domain="" context="{'group_by':'account_id'}"/>
+                        <filter name="cash_type" string="Cash Type" domain="" context="{'group_by':'cash_type'}"/>
+                        <filter name="journal_id" string="Journal" domain="" context="{'group_by':'journal_id'}"/>
+                        <filter name="state" string="Status" domain="" context="{'group_by':'state'}"/>
+                        <filter string="Payment" name="payment_type" domain="[('cash_type','=','pay')]"/>
+                        <filter string="Receive" name="receive_type" domain="[('cash_type','=','receive')]"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_cashbook_form" model="ir.ui.view">
+            <field name="name">account.cashbook.form</field>
+            <field name="model">account.cashbook</field>
+            <field name="arch" type="xml">
+                <form string="Cash Book">
+                    <header>
+                        <button name="validate_cashbook" string ="Validate" type="object"
+                            style="display:block;background-color:green;color:white;" attrs="{'invisible':[('state','=','done')]}"/>
+                        <field name="state" widget="statusbar"/>    
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="ref_no" attrs="{'readonly':[('state','=','done')]}"/>
+                                <field name="cash_type"/>
+                            </group>
+                            <group>
+                                <field name="date" attrs="{'readonly':[('state','=','done')]}"/>
+                                <field name="journal_id" attrs="{'readonly':[('state','=','done')]}"/>
+                                <field name="account_id" attrs="{'readonly':[('state','=','done')]}"/>
+                                <field name="currency_id" attrs="{'readonly':[('state','=','done')]}"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page name="cashbook_line" string="Cashbook Line" >
+                                <field name="line_ids" nolabel="1" attrs="{'readonly':[('state','=','done')]}">
+                                    <tree editable="buttom">
+                                        <field name="account_id"/>
+                                        <field name="amount"/>
+                                        <field name="name"/>
+                                        <field name="currency_id"/>
+                                    </tree>
+                                </field>
+                            </page>
+                            <page name="journal_entries" string="Journal Entries" attrs="{'invisible':[('state','!=','done')]}">
+                                <field name="move_ids" nolabel="1" readonly="1" />
+                            </page>
+                        </notebook>
+                        <label for="note" string="Notes" />
+                        <field name="note" nolabel="1" />
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids" widget="mail_followers" groups="base.group_user"/>
+                        <field name="message_ids" widget="mail_thread"/>
+                    </div>
+                </form>
+            </field>
+         </record>
+
+        <record id="view_cashbook_tree" model="ir.ui.view">
+            <field name="name">Cash Book Tree</field>
+            <field name="model">account.cashbook</field>
+            <field name="arch" type="xml">
+                <tree string="Cash Book List">
+                    <field name="name" />
+                    <field name="date" />
+                    <field name="ref_no" />
+                    <field name="account_id" />
+                    <field name="state"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="view_cashbook_payment_action" model="ir.actions.act_window">
+            <field name="name">CashBook Payment</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">account.cashbook</field>
+            <!-- <field name="view_type">form</field> -->
+            <field name="view_mode">tree,form</field>
+            <!-- <field name="context">{'default_cash_type':'pay', 'search_default_payment_type':1}</field> -->
+            <field name="view_id" ref="view_cashbook_tree" />
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">
+                Click to create CashBook Payment.
+                </p>
+                <p>
+                </p>
+            </field>
+        </record>
+
+        <record id="view_cashbook_received_action" model="ir.actions.act_window">
+            <field name="name">CashBook Received</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">account.cashbook</field>
+            <!-- <field name="view_type">form</field> -->
+            <field name="view_mode">tree,form</field>
+            <!-- <field name="context">{'default_cash_type':'receive', 'search_default_receive_type':1}</field> -->
+            <field name="view_id" ref="view_cashbook_tree" />
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">
+                Click to create CashBook Received.
+                </p>
+                <p>
+                </p>
+            </field>
+        </record>
+
+        <!-- Sequences for account.cashbook --> 
+        <!-- <record id="seq_cashbook_payment" model="ir.sequence">
+            <field name="name">CashBook Payment</field>
+            <field name="code">pay</field>
+            <field name="prefix">PV</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_cashbook_received" model="ir.sequence">
+            <field name="name">CashBook Receive</field>
+            <field name="code">receive</field>
+            <field name="prefix">RV</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record> -->
+
+        <menuitem id="menu_payment" name="CashBook Payment" sequence="3" parent="account.menu_finance_entries" action="view_cashbook_payment_action"/>
+
+        <menuitem id="menu_received" name="CashBook Received" sequence="4" parent="account.menu_finance_entries" action="view_cashbook_received_action"/>
+
+        <menuitem action="account.action_account_moves_all" id="account.menu_action_account_moves_all" parent="account.menu_finance_entries" sequence="1" groups="account.group_account_user" />
+
+    </data>
+</odoo>

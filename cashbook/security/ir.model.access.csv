@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+cashbook_user,cashbook_user,cashbook.model_account_cashbook,account.group_account_invoice,1,1,1,1
+cashbook_line_user,cashbook_line_user,cashbook.model_account_cashbook_line,account.group_account_invoice,1,1,1,1
