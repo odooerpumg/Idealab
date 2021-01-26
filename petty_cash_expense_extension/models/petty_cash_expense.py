@@ -57,6 +57,7 @@ class PettyCashExpense(models.Model):
 		('request', 'Requested'),
 		('manager_validate', 'Manager Approved'),
 		('validate', 'Finance Approved'),
+		('gm_approve', 'GM Approved'),
 		('refuse', 'Refused'),
 		('cancel', 'Cancel')
 		], string='Status', readonly=True, track_visibility='onchange', copy=False, default='draft')
@@ -113,7 +114,9 @@ class PettyCashExpense(models.Model):
 			aa = payment_obj.create(payment_value)
 			aa.post()
 		return self.write({'state': 'validate'})
-			
+		
+	def gm_approve(self):
+		return self.write({'state': 'gm_approve'})
 
 	def refuse(self):
 		self.write({'state': 'refuse'})

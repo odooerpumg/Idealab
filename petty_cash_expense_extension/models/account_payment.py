@@ -91,8 +91,15 @@ class AccountPayment(models.Model):
 
 class AccountMove(models.Model):
 	_inherit = 'account.move'
+	_order = 'create_no asc'
+
+	create_no = fields.Char('Create ID',store=True)
 
 	def post(self):
+		# for move in self:
+		# 	move.create_no += 1
+		# 	print('.......................... Create No = ',move.create_no)
+		# 	move.write(move.create_no)
 		# `user_has_group` won't be bypassed by `sudo()` since it doesn't change the user anymore.
 		if not self.env.su and not self.env.user.has_group('account.group_account_invoice'):
 			raise AccessError(_("You don't have the access rights to post an invoice."))
@@ -146,11 +153,13 @@ class AccountMove(models.Model):
 				# Consume a new number.
 
 			# 11-01-2021 by M2h ************************************************
+				
 				year = datetime.now().year
 				month = datetime.now().month
 				journal = self.journal_id.code
 				seq = self.env['ir.sequence'].next_by_code('account.move')
 				to_write['name'] = str(self.env.user.company_id.code)+'/'+str(journal)+'/'+str(year)+'/'+str(month)+seq
+				to_write['create_no'] = str('C')+seq
 				# to_write['name'] = sequence.with_context(ir_sequence_date=move.date).next_by_id()
 
 			move.write(to_write)

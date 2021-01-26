@@ -33,6 +33,7 @@
 
 					<field name="is_approve" invisible="1"/>
 					<field name="is_approve_finance" invisible="1"/>
+					<field name="is_cashier" invisible="0"/>
 					<!-- <field name="can_approve" invisible="1"/> -->
 					<button name="general_expense_confirm" states="draft" string="Submit" type="object" class="oe_highlight"/>     
 					
@@ -42,11 +43,13 @@
 					
 					<button name="approve" states="manager_approve" string="Finance Approved" type="object" attrs="{'invisible':['|', ('is_approve_finance', '=', False)]}" class="oe_highlight"/>
 
-					<button name="general_expense_paid" states="approved" string="Paid" type="object" class="oe_highlight"/>
+					<button name="gm_approve" states="approve" string="GM Approve" type="object" groups="petty_cash_expense_extension.group_petty_gm,petty_cash_expense_extension.group_petty_admin" class="oe_highlight"/>
+
+					<button name="general_expense_paid" states="approved" string="Paid" type="object" groups="petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" class="oe_highlight"/>
 					
 					<button string="Cancel" name="cancel" states="refuse,request,manager_approve,approved" type="object" groups="hr_expense.group_hr_expense_team_approver"/>
 
-					<field name="state" widget="statusbar" statusbar_visible="draft,confirm,manager_approve,approved,paid" statusbar_colors='{"confirm":"blue","manager_approve":"blue","approved":"blue","cancelled":"red"}'/>
+					<field name="state" widget="statusbar" statusbar_visible="draft,confirm,manager_approve,approved,gm_approve,paid" statusbar_colors='{"confirm":"blue","manager_approve":"blue","approved":"blue","gm_approve":"blue","cancelled":"red"}'/>
 				</header>
 				<sheet>
 					<div class="oe_title">
@@ -87,7 +90,7 @@
 							<field name="expense_prepaid_ids" attrs="{'readonly': [('state', 'not in', 'draft')]}"/>
 							<field name="advance_amount" invisible="1" />
 							<field name="currency_id" attrs="{'readonly': [('state', 'not in', 'draft')]}"/>
-							<field name="state_type" attrs="{'invisible':[('state','=','draft')]}" string="Journal" />
+							<field name="state_type" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" />
 							<field name="cash_account" attrs="{'invisible':['|',('cash_inv','=',True),('state','=','draft')],'required':[('cash_inv','!=',True),('state','=','confirm')]}" />
 							<field name="paid_date" invisible="1"/>
 							<field name="account_move_id" invisible="1"/>

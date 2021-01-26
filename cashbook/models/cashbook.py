@@ -124,10 +124,7 @@ class AccountCashBook(models.Model):
 				raise ValidationError('Done records cannot be deleted.')
 			for line in result.line_ids:
 				line.unlink()
-		res = super(AccountCashBook, self).unlink()
-		return res
-
-
+		return super(AccountCashBook, self).unlink()
 
 class AccountCashBookLine(models.Model):
 	_name = 'account.cashbook.line'

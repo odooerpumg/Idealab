@@ -27,6 +27,8 @@ Advanced Expenses
         'views/expense_view.xml',
         'views/hr_expense_prepaid_view.xml',
         'views/account_transfer_view.xml',
+        'views/account_move_view.xml',
+        'views/advance_claim_view.xml',
     ],
     'demo': [
     ],

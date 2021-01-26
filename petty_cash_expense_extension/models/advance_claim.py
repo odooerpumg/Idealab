@@ -14,25 +14,13 @@ import json
 import requests
 import locale
 
-class Expense_Prepaid_Account(models.Model):
-	_name = "expense.prepaid.account"
-	
-	account_code = fields.Char('Account Code')
-	account_name = fields.Char('Account Name')
+class ProductProduct(models.Model):
+	_inherit = 'product.product'
 
-	# @api.multi
-	def name_get(self):
-		res = super(Expense_Prepaid_Account, self).name_get()
-		data = []
-		for expense in self:
-			display_value = ''
-			display_value += str(expense.account_name) or ""
-			data.append((expense.id, display_value))
-		return data
+	adv_claim_id = fields.Many2one('advance.claim','Advance Claim')
 
 class Expense_Prepaid(models.Model):
-	_name = 'expense.prepaid'
-	_description = 'Expense Prepaid'
+	_name = 'advance.claim'
 	_inherit = 'mail.thread'
 	_order = "invoice_date desc, voucher_no desc"
 
@@ -42,16 +30,6 @@ class Expense_Prepaid(models.Model):
 		my_date = fields.Datetime.context_timestamp(self, timestamp=datetime.now())
 		return my_date
 
-	def get_sequence(self):
-	# 11-01-2021 by M2h ********************************************8
-	  sequence = self.env['ir.sequence'].next_by_code('expense.prepaid')
-	  year = datetime.now().year
-	  month = datetime.now().month
-	  if month < 10:
-	  	month = '0'+str(month)
-	  seq_no = str(self.env.user.company_id.code)+'-'+'ADV-'+str(year)+'-'+str(month)+sequence
-	  print('....................... sequence no is = ',str(seq_no))
-	  return seq_no
 
 	state = fields.Selection([
 		('draft', 'Draft'),
@@ -90,11 +68,11 @@ class Expense_Prepaid(models.Model):
 	chart_of_account = fields.Many2one('account.account','Chart of Account')
 	currency_id = fields.Many2one('res.currency', 'Currency',required=True, default=119, readonly=True, states={'draft':[('readonly',False)],'cancelled':[('readonly',False)]})
 	account_name = fields.Char(' ')
-	state_type = fields.Many2one('account.journal', string='Journal')
-	cash_account = fields.Many2one('account.account','Paid By')
-	move_line_ids = fields.One2many('account.move.line', 'general_exp_id', string='Journal Advance', store=True)
-	exp_move_line_ids = fields.One2many('account.move.line', 'exp_exp_id', string='Journal Expense', store=True)
-	adj_move_line_ids = fields.One2many('account.move.line', 'adj_exp_id', string='Journal Adjustment', store=True)
+	state_type = fields.Many2one('account.journal', string='Journal',required=True)
+	cash_account = fields.Many2one('account.account','Paid By',domain=[('user_type_id','=','Bank and Cash')])
+	move_line_ids = fields.One2many('account.move.line', 'adv_claim_id', string='Journal Advance Claim', store=True)
+	# exp_move_line_ids = fields.One2many('account.move.line', 'exp_exp_id', string='Journal Expense', store=True)
+	# adj_move_line_ids = fields.One2many('account.move.line', 'adj_exp_id', string='Journal Adjustment', store=True)
 	note = fields.Text('ADVANCE NOTE')
 	can_reset = fields.Boolean(compute='_get_can_reset')
 	can_approve = fields.Boolean(compute='_get_can_approve')
@@ -110,9 +88,9 @@ class Expense_Prepaid(models.Model):
 	snd_aproval = fields.Many2one('hr.employee', string='Second Aproval', domain="[('active','=',True)]" )
 	analytic_id = fields.Many2one('account.analytic.account','Analytic Account')
 	company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.user.company_id, required=True)
-	line_ids = fields.One2many('expense.prepaid.line', 'prepaid_id', 'Expense Lines')
+	line_ids = fields.One2many('advance.claim.line', 'calim_id', 'Expense Lines')
 	# TPS===================
-	product_id = fields.Many2many('product.product', 'prepaid_product_rel', 'prepaid_id', 'product_id',string='Product')
+	product_id = fields.Many2many('product.product', 'prepaid_product_rel', 'calim_id', 'product_id',string='Product')
 	# TPS===================
 
 		# product_id = fields.Many2one('product.product', 'Product', required=True, domain="[('can_be_expensed','=',False)]")
@@ -158,7 +136,20 @@ class Expense_Prepaid(models.Model):
 			# approve.is_user = user
 			# approve.write({'is_cashier': cashier})
 			approve.write({'is_user': user})
-			# print('....................... cashier= ',cashier,' and user= ',user)
+
+	def get_sequence(self):
+	# 11-01-2021 by M2h ********************************************8
+	  sequence = self.env['ir.sequence'].next_by_code('advance.claim')
+	  journal_ids = self.env['account.journal'].search([('id','=',self.state_type.id)])
+	  code = journal_ids.state_type.code
+	  print('...........>>>>>>>>>>>>>>>>>>>>>>>>>>>>> code = ',code,' and journal = ',journal_ids)
+	  year = datetime.now().year
+	  month = datetime.now().month
+	  if month < 10:
+	  	month = '0'+str(month)
+	  seq_no = str(self.env.user.company_id.code)+'-'+str(code)+'-'+str(year)+'-'+str(month)+sequence
+	  print('....................... sequence no is = ',str(seq_no))
+	  return seq_no
 
 	@api.onchange('employee_name')
 	def onchange_employee(self):
@@ -188,7 +179,7 @@ class Expense_Prepaid(models.Model):
 				total += line.amount
 			self.advance_amount = total
 
-	def prepaid_expense_paid(self):
+	def advance_claim_paid(self):
 		for expense in self:
 			journal = expense.state_type
 			expense.paid_date = date.today()
@@ -305,7 +296,7 @@ class Expense_Prepaid(models.Model):
 			print('woking here ---------------------------->><<>>><<>>>',line['price'])
 			return {
 				'date_maturity': line.get('date_maturity'),
-				'general_exp_id': self.id,
+				'adv_claim_id': self.id,
 				#'partner_id': partner_id,
 				'name': line['name'][:64],
 				'debit': line['price'] > 0 and line['price'],
@@ -327,7 +318,7 @@ class Expense_Prepaid(models.Model):
 			print('not working here ----------------------->><<>><<>>')
 			return {
 				'date_maturity': line.get('date_maturity'),
-				'general_exp_id': self.id,
+				'adv_claim_id': self.id,
 				#'partner_id': partner_id,
 				'name': line['name'][:64],
 				'debit': line['price'] > 0 and line['price'],
@@ -403,13 +394,13 @@ class Expense_Prepaid(models.Model):
 			recs = self.search([('voucher_no', operator, name)] + args, limit=limit)
 		return recs.name_get()
 
-	def prepaid_expense_confirm(self):
+	def advance_claim_confirm(self):
 		return self.write({'state': 'confirm'})
 
 	# def md_approved(self):
 	# 	return self.write({'state': 'md'})
 
-	def prepaid_expense_draft(self):
+	def advance_claim_draft(self):
 		user_ids = self.env['res.users'].search([('id','=',self.env.uid)])
 		if user_ids.has_group('petty_cash_expense_extension.group_users'):
 			raise ValidationError('User group not allowed for this!')
@@ -417,7 +408,7 @@ class Expense_Prepaid(models.Model):
 
 	######## Line Manager #########
 
-	def prepaid_expense_manager_accept(self):
+	def advance_claim_manager_accept(self):
 		return self.write({'state': 'manager_approve'})
 
 	def approve(self):
@@ -427,7 +418,7 @@ class Expense_Prepaid(models.Model):
 		return self.write({'state': 'gm_approve'})
 
 	# @api.one
-	# def prepaid_expense_manager_accept_snd(self):
+	# def advance_claim_manager_accept_snd(self):
 	# 	return self.write({'state': 'manager_accepted_snd'})
 
 	# @api.one
@@ -436,7 +427,7 @@ class Expense_Prepaid(models.Model):
 
 		
 
-	def prepaid_expense_cashier_closed(self):
+	def advance_claim_cashier_closed(self):
 		date = self.get_today()
 		close_ref = self.name_reference
 		return self.write({'close_date': date,'state': 'closed','close_ref':close_ref})
@@ -490,31 +481,16 @@ class Expense_Prepaid(models.Model):
 	def reset_to_draft(self, cr, uid, ids, context=None):
 		return self.write(cr, uid, ids, {'state': 'draft'}, context=context)
 
-	# reopen when error solve
-		 
-	# @api.one
-	# @api.onchanage('employee_name')
-	# def onchange_employee_name(self):
-	#     emp_obj = self.env['hr.employee']
-	#     # next_approval_person = False
-	#     # company_id = False
-	#     if self.employee_name:
-	#         employee = emp_obj.search([('id','=',self.employee_name.id)])
-	#         next_approval_person = employee.parent_id.id
-	#         company_id = employee.company_id.id
-	#         self.next_approval_person = next_approval_person
-	#         self.company_id = company_id
-
 
 class Expense_Prepaid_Line(models.Model):
-	_name = 'expense.prepaid.line'
+	_name = 'advance.claim.line'
 	_description = 'Expense Prepaid Line'    
 
-	prepaid_id = fields.Many2one('expense.prepaid', 'Title', ondelete='cascade', select=True)    
+	calim_id = fields.Many2one('advance.claim', 'Title', ondelete='cascade', select=True)    
 	product_id = fields.Many2one('product.product', 'Product', domain="[('can_be_expensed','=',True)]")
 	sequence = fields.Integer('Sequence', select=True, help="Gives the sequence order when displaying a list of expense lines.")
 	date_value = fields.Date('Date',required=True,store=True)
-	analytic_account = fields.Many2one('account.analytic.account','Analytic account',related="prepaid_id.analytic_id")
+	analytic_account = fields.Many2one('account.analytic.account','Analytic account',related="calim_id.analytic_id")
 	account_ids = fields.Many2one('account.account', string='Account Name',store=True)
 	account_code = fields.Char(string='Account Code',related='account_ids.code',store=True)
 	amount = fields.Float(string='Total Amount',store=True)
@@ -529,14 +505,14 @@ class Expense_Prepaid_Line(models.Model):
 			product=product.id
 			amount_unit = product.standard_price
 			self.uom_id = product.uom_id.id
-			self.date_value = self.prepaid_id.invoice_date
+			self.date_value = self.calim_id.invoice_date
 			self.account_ids = self.product_id.property_account_expense_id
-			self.analytic_account = self.prepaid_id.analytic_id
-			self.ref = self.prepaid_id.name_reference
+			self.analytic_account = self.calim_id.analytic_id
+			self.ref = self.calim_id.name_reference
 
 	# @api.multi
 	def _get_line_numbers(self):
-		for expense in self.mapped('prepaid_id'):
+		for expense in self.mapped('calim_id'):
 			line_no = 1
 			for line in expense.line_ids:
 				line.line_no = line_no
@@ -553,49 +529,12 @@ class Expense_Prepaid_Line(models.Model):
 	def create(self,data):
 		if data:
 			#print data,"Data_______"
-			prepaid_id = super(Expense_Prepaid_Line, self).create(data)
-		return prepaid_id
+			calim_id = super(Expense_Prepaid_Line, self).create(data)
+		return calim_id
 	
 	# @api.one
 	def write(self,vals):
 		flag = super(Expense_Prepaid_Line, self).write(vals)
 
 		return flag
-
-
-# class Expense_Prepaid_Advance_Account(models.Model):
-# 	_name = "expense.prepaid.adv_account"
-	
-# 	account_code = fields.Char('Account Code')
-# 	account_name = fields.Char('Account Name')
-
-# 	def name_get(self):
-# 		res = super(Expense_Prepaid_Advance_Account, self).name_get()
-# 		data = []
-# 		for expense in self:
-# 			display_value = ''
-# 			display_value += str(expense.account_name) or ""
-# 			data.append((expense.id, display_value))
-# 		return data
-
-# class rescurrency_inherit(models.Model):
-
-# 	_inherit = 'res.currency'
-
-# 	base = fields.Boolean('Base')
-# 	active = fields.Boolean('Active',default="True")
-# 	line_id = fields.One2many('res.currency.line','res_id')
-
-# class rescurrency_line(models.Model):
-
-# 	_name = 'res.currency.line'
-
-# 	res_id = fields.Many2one('res.currency','Currency Line')
-# 	date=fields.Date('Date')
-# 	rate = fields.Float('Rate')
-
-
-
-
-		
 		

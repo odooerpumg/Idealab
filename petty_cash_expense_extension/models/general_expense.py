@@ -29,6 +29,8 @@ class AccountMoveLine(models.Model):
 	adj_exp_id = fields.Many2one('expense.prepaid','Adjustment Expenses')
 	expense_id = fields.Many2one('hr.expense','Expenses')
 	acc_transfer_id = fields.Many2one('account.transfer','Account Transfer Journal')
+	adv_claim_id = fields.Many2one('advance.claim','Advance Claim')
+
 
 class AccountAccount(models.Model):
 	_inherit = "account.account"
@@ -84,6 +86,8 @@ class hr_general_expense(models.Model):
 		sequence = self.env['ir.sequence'].next_by_code('hr.expense')
 		year = datetime.now().year
 		month = datetime.now().month
+		if month < 10:
+	  		month = '0'+str(month)
 		seq_no = str(self.env.user.company_id.code)+'-'+'AC-'+str(year)+'-'+str(month)+sequence
 		print('....................... sequence no is = ',str(seq_no))
 		return seq_no
@@ -146,6 +150,7 @@ class hr_general_expense(models.Model):
 		('confirm', 'Submitted'),
 		('manager_approve','Manager Approved'),
 		('approved', 'Finance Approved'),
+		('gm_approve', 'GM Approved'),
 		('cancel', 'Cancelled'),
 		('paid', 'Paid'),
 		('refused','Refused'),
@@ -171,21 +176,28 @@ class hr_general_expense(models.Model):
 	finance_approved_id = fields.Many2one('hr.employee',string='Finance Approved', domain="[('department_id','=','Finance&Account')]")
 	is_approve = fields.Boolean('Is Approve Manager ?',compute='get_approve',default=False)
 	is_approve_finance = fields.Boolean('Is Approve Finance ?',compute='get_approve',default=False)
-	
+	user_id = fields.Many2one('res.users','User', default=lambda self: self.env.user,track_visibility='onchange')
+	is_cashier = fields.Boolean('Is Cashier',compute='get_approve', default=False)
+
 	def get_approve(self):
 		for approve in self:
 			reason = False
 			finance = False
+			cashier = False
 			to_approve_id = self.env.uid
+			user = approve.user_id
 			print('.................. now id ',to_approve_id,' and approve id ',approve.approved_by_id.user_id)
 			# to_approve_id= self.env['hr.employee'].search([('user_id', '=', self.env.uid)]).id
 			if to_approve_id == approve.approved_by_id.user_id.id:
 				reason = True
 			if to_approve_id == approve.finance_approved_id.user_id.id:
 				finance = True
-			print ('>>>>>>>>>>>>> approve ? >>>>>>>>>>>>>>>>> ', reason)
+			if user.has_group('petty_cash_expense_extension.group_petty_cashier'):
+				cashier = True
+			print ('>>>>>>>>>>>>> cashier approve ? >>>>>>>>>>>>>>>>> ', cashier)
 			approve.is_approve = reason
 			approve.is_approve_finance = finance
+			approve.is_cashier = cashier
 
 	# @api.model
 	# @api.onchange('currency_id')
@@ -353,6 +365,9 @@ class hr_general_expense(models.Model):
 	# 	return self.write({'state': 'manager_accepted_snd', 'date_valid': time.strftime('%Y-%m-%d'),})
 	def approve(self):
 		return self.write({'state': 'approved'})
+
+	def gm_approve(self):
+		return self.write({'state': 'gm_approve'})
 	# @api.one
 	def cancel(self):
 		return self.write({'state': 'cancel'})
@@ -425,6 +440,19 @@ class hr_general_expense(models.Model):
 			#print lines,'----------------'
 			move.with_context(dont_create_taxes=True).write({'line_ids': lines})
 			move.post()
+			# acc_ids = self.env['account.account'].search([('name','=','Cash')])
+			# exp = self.amount
+			# adv = self.advance_amount
+			# acc_ids = self.env['account.account'].search([('name','=','Cash')])
+			# print('.......................... exp = ',exp,' and adv = ',adv)
+			# if adv > exp:
+			# 	collect = exp - adv
+			# 	line_value = {
+			# 			'account_id': acc_ids.id,
+			# 			'debit': 0,
+			# 			'credit': collect,
+
+			# 	}
 			if expense.expense_prepaid_ids:
 				self.close_expenses()
 				self.exchange_gain_loss_expenses()
@@ -494,6 +522,13 @@ class hr_general_expense(models.Model):
 		#partner_id = self.employee_id.address_home_id.commercial_partner_id.id
 		print(line.get('amount_currency'),line,'----------------------Expense')
 		if self.currency_id.id !=self.company_id.currency_id.id:
+	# 22-01-2021 Extra credit by M2h
+			# exp = self.amount
+			# adv = self.advance_amount
+			# acc_ids = self.env['account.account'].search([('name','=','Cash')])
+			# print('.......................... exp = ',exp,' and adv = ',adv)
+			# if adv > exp:
+			# 	collect = exp - adv
 			return {
 				'date_maturity': line.get('date_maturity'),
 				'exp_exp_id': self.expense_prepaid_ids.id,
@@ -513,8 +548,9 @@ class hr_general_expense(models.Model):
 				'analytic_account_id': line.get('analytic_account_id'),
 				'payment_id': line.get('payment_id'),
 			}
+			
 		else:
-			 return {
+			return {
 				'date_maturity': line.get('date_maturity'),
 				'exp_exp_id': self.expense_prepaid_ids.id,
 				'expense_id':self.id,
@@ -590,7 +626,7 @@ class hr_general_expense(models.Model):
 		# refund = 'Refund: '+str(move_idd.name)
 		collect = 'Collect: '+str(self.expense_prepaid_ids.voucher_no)
 		refund = 'Refund: '+str(self.expense_prepaid_ids.voucher_no)
-		journal_idd = self.env['account.journal'].search([('name','=','Adjustment Journal')])
+		journal_idd = self.env['account.journal'].search([('code','=','JV')])
 		print('Adjustment Journal.................',journal_idd)
 		for expense in self:
 			if not expense.date:

@@ -22,24 +22,26 @@
 
 						<button name="approve" states="manager_approve" string="Finance Approve" type="object" attrs="{'invisible':['|', ('is_approve_finance', '=', False)]}" class="oe_highlight"/>
 
-						<button name="prepaid_expense_paid" states="approve" string="Paid" type="object" class="oe_highlight"/>
+						<button name="gm_approve" states="approve" string="GM Approve" type="object" groups="petty_cash_expense_extension.group_petty_gm,petty_cash_expense_extension.group_petty_admin" class="oe_highlight"/>
+
+						<button name="prepaid_expense_paid" states="approve" string="Paid" type="object" groups="petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" class="oe_highlight"/>
 						
 						<button name="prepaid_expense_cashier_closed" states="paid" string="Close" type="object" class="oe_highlight"/>
 
 						<button name="cancel" states="manager_approve,approve,paid" string="Cancel" type="object" class="oe_highlight"/>
 
-						<field name="state" widget="statusbar" statusbar_visible="draft,confirm,manager_approve,approve,paid,closed"
-						 statusbar_colors='{"confirm":"blue","manager_approve":"blue","approve":"blue","paid":"blue","closed":"red","refuse":"red"}' />
+						<field name="state" widget="statusbar" statusbar_visible="draft,confirm,manager_approve,approve,gm_approve,paid,closed"
+						 statusbar_colors='{"confirm":"blue","manager_approve":"blue","approve":"blue","gm_approve":"blue","paid":"blue","closed":"red","refuse":"red"}' />
 					</header>
 					<sheet>
 						<div class="oe_title">
 							<h1>
-								<field name="voucher_no" attrs="{'invisible': [('state', 'in',('draft'))],'readonly': [('state', 'not in', ('draft','confirm'))]}" nolabel="1"/>
+								<field name="voucher_no" attrs="{'invisible': [('state', '=','draft')],'readonly': [('state', '!=', 'draft')]}" nolabel="1"/>
 							</h1>
 							
 							<h1>
 								<field name="name_reference" placeholder="e.g Mr.Aung,Business Trip"
-							nolabel="1" attrs="{'readonly': [('state', 'not in', 'draft')]}"/>
+							nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
 							</h1>
 						</div>
 						<br />
@@ -51,20 +53,19 @@
 								<field name="department_id" attrs="{'readonly': [('state', 'not in', ('draft','confirm'))]}" />
 								<field name="approved_by_id" attrs="{'readonly': [('state', 'not in', ('draft','confirm'))]}"/>
 								<field name="finance_approved_id" attrs="{'readonly': [('state', 'not in', ('draft','confirm'))]}"/>
-								<field name="account_ids"  attrs="{'invisible':[('state','=','draft')]}"/>
-								<field name="account_code" readonly="1" attrs="{'invisible':[('state','=','draft')]}"/>	
+								<field name="account_ids"  attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin"/>
+								<field name="account_code" readonly="1" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin"/>	
 								<!-- 20190524 by yma							 -->
-								<field name="analytic_id" attrs="{'readonly': [('state', 'not in', 'draft')]}" invisible='1' />							
+								<field name="analytic_id" attrs="{'readonly': [('state', '!=', 'draft')]}" invisible='1' />							
 							</group>
 							<group name="right_group">
 								<!-- Update By TPS 21-6-2019 -->
-								<field name="company_id" attrs="{'readonly': [('state', 'not in', 'draft')]}"/>
-								<field name="invoice_date" attrs="{'readonly': [('state', 'not in', 'draft')]}"/>
-								<field name="state_type" attrs="{'invisible':[('state','=','draft')]}" />
-								<field name="cash_account" attrs="{'invisible':[('state','=','draft')]}" />
+								<field name="company_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+								<field name="invoice_date" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+								<field name="state_type" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" />
+								<field name="cash_account" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" />
 								<field name="currency_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
-								<field name="advance_amount" string ="Amount" attrs="{'readonly':[('state','not in','draft')]}"/>
-								
+								<field name="advance_amount" string ="Amount" attrs="{'readonly':[('state','!=','draft')]}"/>
 							</group>
 						</group>
 						<notebook attrs="{'invisible': [('state', 'not in', ['paid','closed'])]}">
@@ -138,11 +139,11 @@
 		</record>
 
 		<record id="action_hr_expense_prepaid_record" model="ir.actions.act_window">
-			<field name="name">Prepaid Expenses</field>
+			<field name="name">Advance Request</field>
 			<field name="res_model">expense.prepaid</field>
 			<field name="type">ir.actions.act_window</field>
 			<field name="view_mode">tree,form</field>
-			<field eval="False" name="view_id"/>
+			<field name="view_id" ref="view_expenses_prepaid_tree" />
 		</record>
 
 		<record id="view_hr_expense_account_form" model="ir.ui.view">
@@ -171,25 +172,19 @@
 				</tree>
 			</field>
 		</record>
-		<record id="action_hr_expense_account_view" model="ir.actions.act_window">
-			<field name="name">HR Expense Account</field>
-			<field name="res_model">expense.prepaid.account</field>
-			<field name="type">ir.actions.act_window</field>
-			<!-- <field name="view_type">form</field> -->
-			<field name="view_mode">tree,form</field>
-			<field name="view_id" ref="view_hr_expense_account_tree" />
-		</record>
-		
-
 		<record id="view_hr_prepaid_expense_filter" model="ir.ui.view">
 			<field name="name">expense.prepaid.filter</field>
 			<field name="model">expense.prepaid</field>
 			<field name="arch" type="xml">
-				<search string="Prepaid Expense">
-					<filter icon="terp-camera_test" domain="[('state','in',['manager_accepted','compliance_accepted'])]" string="Finance Manager Approve" name="manager_accepted"/>
-					<filter icon="terp-camera_test" domain="[('state','=','manager_accepted1')]" string="Compliance Manager Approve" name="manager_accepted1"/>
-					<filter icon="terp-camera_test" domain="[('state','=','confirm')]" string="Department Manager Approve" name="confirm"/>
-					<filter icon="terp-camera_test" domain="[('state','=','finance_accepted')]" string="Cashier Approve" name="finance_accepted"/>
+				<search string="Advance Request">
+					<filter icon="terp-camera_test" domain="[('state','=','draft')]" string="Draft" name="prepaid_expense_draft"/>
+					<filter icon="terp-camera_test" domain="[('state','=','confirm')]" string="Confirm" name="prepaid_expense_confirm"/>
+					<filter icon="terp-camera_test" domain="[('state','=','manager_approve')]" string="Manager Approved" name="prepaid_expense_manager_accept"/>
+					<filter icon="terp-camera_test" domain="[('state','=','approve')]" string="Finance Approved" name="approve"/>
+					<filter icon="terp-camera_test" domain="[('state','=','paid')]" string="Paid" name="prepaid_expense_paid"/>
+					<filter icon="terp-camera_test" domain="[('state','=','closed')]" string="Close" name="expense_close"/>
+					<filter icon="terp-camera_test" domain="[('state','=','cancelled')]" string="Cancel" name="expense_canceled"/>
+					<filter icon="terp-camera_test" name="to_approve" domain="[('state','in',['confirm','manager_approve','approve'])]" string="To Approve" help="Confirmed Expenses"/>
 					<field name="name_reference" />
 					<field name="employee_name" />
 					<field name="voucher_no" string="Voucher No"/>
@@ -202,6 +197,18 @@
 			</field>
 		</record>
 
+		<record id="action_hr_expense_account_view" model="ir.actions.act_window">
+			<field name="name">HR Expense Account</field>
+			<field name="res_model">expense.prepaid.account</field>
+			<field name="type">ir.actions.act_window</field>
+			<!-- <field name="view_type">form</field> -->
+			<field name="view_mode">tree,form</field>
+			<field name="search_view_id" ref="view_hr_prepaid_expense_filter"/>
+			<field name="view_id" ref="view_hr_expense_account_tree" />
+		</record>
+		
+
+		
 		<record id="view_hr_general_expense_filter" model="ir.ui.view">
 			<field name="name">hr.expense.filter</field>
 			<field name="model">hr.expense</field>
@@ -214,14 +221,13 @@
 				   <!--  <field name="main_category" />
 					<field name="sub_category" /> -->
 					<field name="note" />
-					<filter icon="terp-document-new" name="new" domain="[('state','=','draft')]" string="New" help="New Expense"/>
-					<filter icon="terp-camera_test" domain="[('state','in',['manager_accepted','compliance_accepted'])]" string="Finance Manager Approve" name="manager_accepted"/>
-					<filter icon="terp-camera_test" domain="[('state','=','manager_accepted1')]" string="Compliance Manager Approve" name="manager_accepted1"/>
-					<filter icon="terp-camera_test" domain="[('state','=','done')]" string="Finance Cashier Approve" name="done"/>
-					<filter icon="terp-camera_test" domain="[('state','=','confirm')]" string="Department Manager Approve" name="confirm"/>
-					<filter icon="terp-camera_test" domain="[('state','=','manager_accepted')]" string="Finance User Edit" name="manager_accepted_user"/>
-					<filter icon="terp-camera_test" name="to_approve" domain="[('state','=','confirm')]" string="To Approve" help="Confirmed Expenses"/>
-					<filter icon="terp-dolar" name="to_pay" domain="['|',('state','=','accepted'),('state','=','done')]" string="To Pay" help="Expenses to Invoice"/>
+					<filter icon="terp-document-new" name="general_expense_draft" domain="[('state','=','draft')]" string="Draft" help="New Expense"/>
+					<filter icon="terp-camera_test" domain="[('state','=','confirm')]" string="Confirm" name="general_expense_confirm"/>
+					<filter icon="terp-camera_test" domain="[('state','=','manager_approve')]" string="Manager Approved" name="general_expense_manager_accept"/>
+					<filter icon="terp-camera_test" domain="[('state','=','approved')]" string="Finance Approved" name="approve"/>
+					<filter icon="terp-camera_test" domain="[('state','=','paid')]" string="Paid" name="general_expense_paid"/>
+					<filter icon="terp-camera_test" domain="[('state','=','cancel')]" string="Cancel" name="cancel"/>
+					<filter icon="terp-camera_test" name="to_approve" domain="[('state','in',['confirm','manager_approve','approved'])]" string="To Approve" help="Confirmed Expenses"/>
 					<separator/>
 					<filter domain="[('user_id', '=', uid)]" string="My Expenses" name="user_id"/>
 					<field name="employee_id"/>
@@ -281,11 +287,11 @@
 		
 
 		
-		<menuitem action="general_expense_all" id="general_expense" name="Advance Clearing" parent="hr_expense.menu_hr_expense_my_expenses" sequence="2" groups="petty_cash_expense_extension.group_petty_approver" />
+		<menuitem action="general_expense_all" id="general_expense" name="Advance Clearing" parent="hr_expense.menu_hr_expense_my_expenses" sequence="2" groups="base.group_user" />
 		<!-- <menuitem action="hr_expense.hr_expense_actions_all" id="hr_travel_expense_menu" name="Travel Expenses" parent="hr_expense_menu" sequence="2" /> -->
-		<menuitem id="menu_hr_expense_prepaid_record" name="Advance Request"
-			action="action_hr_expense_prepaid_record" parent="hr_expense.menu_hr_expense_my_expenses"
-			sequence="1" groups="petty_cash_expense_extension.group_petty_user,petty_cash_expense_extension.group_petty_approver" />
+		<menuitem id="menu_hr_expense_prepaid_record" name="Advance Request" action="action_hr_expense_prepaid_record" parent="hr_expense.menu_hr_expense_my_expenses" sequence="1" groups="base.group_user"/>
+			<!-- petty_cash_expense_extension.group_petty_user,petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin -->
+			<!-- group_petty_user,group_petty_approver,group_petty_cashier,group_petty_admin -->
 		
 		<menuitem id="hr_expense.menu_hr_expense_configuration" name="Configuration" parent='hr_expense.menu_hr_expense_root' sequence="15" />
 
