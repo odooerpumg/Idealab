@@ -49,8 +49,8 @@ class AccountAccount(models.Model):
 
 class hr_general_expense(models.Model):
 	_name = "hr.expense"
-	_inherit = "hr.expense"
-	_description = "General Expense"
+	_inherit = ['hr.expense','mail.thread', 'mail.activity.mixin']
+	_description = "Advance Clearing"
 	_order = "date desc"
 
 	#by yma 20201026
@@ -115,12 +115,12 @@ class hr_general_expense(models.Model):
 	# product_uom_id = fields.Many2one('product.uom', string='Unit of Measure', required=False, readonly=True, states={'draft': [('readonly', False)], 'refused': [('readonly', False)]}, default=lambda self: self.env['product.uom'].search([], limit=1, order='id'))
 	unit_amount = fields.Float(string='Unit Price', readonly=False, required=False, states={'draft': [('readonly', False)], 'refused': [('readonly', False)]}, digits=dp.get_precision('Product Price'))
 
-	name = fields.Char(string='Invoice No',store=True, required=False)
+	name = fields.Char(string='Invoice No',store=True, required=False,tracking=True)
 	# 'id'fields.Integer('Sheet ID', readonly=True),
-	date = fields.Date(string='Date',default=get_default_date, select=True, readonly=True, states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]},required=True)
+	date = fields.Date(string='Date',default=get_default_date, select=True, readonly=True, states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]},required=True,tracking=True)
 	journal_id = fields.Many2one('account.journal', 'Force Journal', help = "The journal used when the expense is done."),
 	# employee_id = fields.Many2one('hr.employee', "Employee", default='_employee_get' ,required=True, readonly=True, states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]})
-	employee_id = fields.Many2one('hr.employee','Employee',states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]},required=True, domain="[('active','=',True)]")
+	employee_id = fields.Many2one('hr.employee','Employee',states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]},required=True, domain="[('active','=',True)]",tracking=True)
 	user_id = fields.Many2one('res.users', 'User', required=True)
 	date_confirm = fields.Date('Confirmation Date', select=True, copy=False,
 								help="Date of the confirmation of the sheet expense. It's filled when the button Confirm is pressed.")
@@ -134,10 +134,10 @@ class hr_general_expense(models.Model):
 	paid_ref = fields.Char('Paid Ref', states={'done':[('required', True)], 'paid':[('readonly', True)]})
 	description = fields.Char('Description', require=True)
 	expense_prepaid_ids = fields.Many2one('expense.prepaid', 'Advance Expense',domain=[('state','=','paid')])
-	amount = fields.Float(string='Total Amount',compute="_amount",store=True)
+	amount = fields.Float(string='Total Amount',compute="_amount",store=True,tracking=True)
 	currency_id = fields.Many2one('res.currency', 'Currency',required=True, domain=[('active','=',True)] ,states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]})
 
-	department_id = fields.Many2one('hr.department','Department', readonly=True, states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]},related="employee_id.department_id")
+	department_id = fields.Many2one('hr.department','Department', readonly=True, states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]},related="employee_id.department_id",tracking=True)
 	# TPS ===============
 	company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.user.company_id, required=True)
 	# TPS ===============
@@ -156,7 +156,7 @@ class hr_general_expense(models.Model):
 		('refused','Refused'),
 		('reported','Reported')
 		],
-		'Status',default="draft")
+		'Status',default="draft",tracking=True)
 	can_reset = fields.Boolean(string='Reset')
 	can_approve = fields.Boolean(string='Approved')
 	state_type = fields.Many2one('account.journal', string='Journal')
@@ -176,7 +176,7 @@ class hr_general_expense(models.Model):
 	finance_approved_id = fields.Many2one('hr.employee',string='Finance Approved', domain="[('department_id','=','Finance&Account')]")
 	is_approve = fields.Boolean('Is Approve Manager ?',compute='get_approve',default=False)
 	is_approve_finance = fields.Boolean('Is Approve Finance ?',compute='get_approve',default=False)
-	user_id = fields.Many2one('res.users','User', default=lambda self: self.env.user,track_visibility='onchange')
+	user_id = fields.Many2one('res.users','User', default=lambda self: self.env.user)
 	is_cashier = fields.Boolean('Is Cashier',compute='get_approve', default=False)
 
 	def get_approve(self):
@@ -347,6 +347,26 @@ class hr_general_expense(models.Model):
 
 	# @api.one
 	def general_expense_confirm(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','hr.expense')])
+		ids = self.approved_by_id.user_id
+		date = self.date
+		name = self.name
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
 		return self.write({'state': 'confirm', 'date_confirm': time.strftime('%Y-%m-%d')})
 
 
@@ -358,15 +378,71 @@ class hr_general_expense(models.Model):
 
 	# @api.one
 	def general_expense_manager_accept(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','hr.expense')])
+		ids = self.finance_approved_id.user_id
+		date = self.date
+		name = self.name
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		mail_s = mail_ids.search([('res_model','=','hr.expense'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
 		return self.write({'state': 'manager_approve', 'date_valid': time.strftime('%Y-%m-%d'),})
 
 	# @api.one
 	# def general_expense_manager_accept_snd(self):
 	# 	return self.write({'state': 'manager_accepted_snd', 'date_valid': time.strftime('%Y-%m-%d'),})
 	def approve(self):
+		mail_ids = self.env['mail.activity']
+		# model_ids = self.env['ir.model'].search([('model','=','hr.expense')])
+		# ids = self.env['hr.employee'].search([('is_gm','=',True)])
+		# ids = self.finance_approved_id.user_id
+		# date = self.date
+		# name = self.name
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		mail_s = mail_ids.search([('res_model','=','hr.expense'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
+		# value = {
+		# 		'activity_type_id': 4,
+		# 		'date_deadline': date,
+		# 		'user_id': ids.user_id.id,
+		# 		'res_model_id': model_ids.id,
+		# 		'res_name': name,
+		# 		'res_id': cc,
+		# }
+		# mail_ids.create(value)
 		return self.write({'state': 'approved'})
 
 	def gm_approve(self):
+		# mail_ids = self.env['mail.activity']
+		# dd = self.ids
+		# cc = ''
+		# for d in dd:
+		# 	cc += str(d)
+		# cc = int(cc)
+		# mail_s = mail_ids.search([('res_model','=','hr.expense'),('res_id','=',cc)])
+		# # print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		# mail_s.unlink()
 		return self.write({'state': 'gm_approve'})
 	# @api.one
 	def cancel(self):
@@ -379,6 +455,10 @@ class hr_general_expense(models.Model):
 	######## Cashier #########
 		
 	def general_expense_paid(self):
+		amount = self.amount
+		adv = self.advance_amount
+		# if amount < adv:
+		# print('..........///////////////// general_expense_paid.......... if condition')
 		move_line_idd = self.env['account.move.line'].search([('general_exp_id','=',self.expense_prepaid_ids.id)])
 		move_idd = self.env['account.move'].search([('id','=',move_line_idd.move_id.id)])
 		print('.................. Move id .........',move_idd.name)
@@ -459,6 +539,11 @@ class hr_general_expense(models.Model):
 				self.expense_prepaid_ids.prepaid_expense_cashier_closed()
 				self.expense_prepaid_ids.write({'advance_account_move_id':move.id})
 		return self.write({'state': 'paid', 'account_move_id':move.id})
+		# else:
+		# 	print('........./////////////////////// general_expense_paid>>>>>>>>>>>> else condition')
+		# 	self.close_expenses()
+		# 	self.expense_prepaid_ids.prepaid_expense_cashier_closed()
+		# 	return self.write({'state': 'paid'})
 
 	#general expense
 	# @api.multi
@@ -619,93 +704,183 @@ class hr_general_expense(models.Model):
 	# @api.multi
 	def close_expenses(self):
 		#print "-------------------CLOSE EXPENSE--------------------------"
-		journal_dict = {}
-		move_line_idd = self.env['account.move.line'].search([('general_exp_id','=',self.expense_prepaid_ids.id)])
-		move_idd = self.env['account.move'].search([('id','=',move_line_idd.move_id.id)])
-		# collect = 'Collect: '+str(move_idd.name)
-		# refund = 'Refund: '+str(move_idd.name)
-		collect = 'Collect: '+str(self.expense_prepaid_ids.voucher_no)
-		refund = 'Refund: '+str(self.expense_prepaid_ids.voucher_no)
-		journal_idd = self.env['account.journal'].search([('code','=','JV')])
-		print('Adjustment Journal.................',journal_idd)
-		for expense in self:
-			if not expense.date:
-				raise UserError(_('You must choose close date!'))
-			acc_date = expense.date
-			diff_amount = expense.advance_amount - expense.amount
-			#print "Different", diff_amount
-			if diff_amount != 0:
-				journal = expense.state_type
-				journal_dict.setdefault(journal, [])
-				journal_dict[journal].append(expense)
-				#print journal_dict.items()
-				#create the move that will contain the accounting entries
-				exp = expense.amount
-				adv = expense.advance_amount
-				if adv > exp:
-					move = self.env['account.move'].create({
-						'journal_id': journal_idd.id,
-						'company_id': self.env.user.company_id.id,
-						'date': acc_date,
-						'ref': collect,
-						'name': '/',
-					})
-					print (collect,'........... if condition')
-				else:
-					move = self.env['account.move'].create({
-						'journal_id': journal.id,
-						'company_id': self.env.user.company_id.id,
-						'date': acc_date,
-						'ref': refund,
-						'name': '/',
-					})
-					print (refund,'........... else condition')
-
-				for journal, expense_list in journal_dict.items():
-					#print "CLOSING"
+		amount = self.amount
+		adv = self.advance_amount
+		if adv > amount:
+			print('..........///////////////// close_expenses.......... if condition')
+			journal_dict = {}
+			move_line_idd = self.env['account.move.line'].search([('general_exp_id','=',self.expense_prepaid_ids.id)])
+			move_idd = self.env['account.move'].search([('id','=',move_line_idd.move_id.id)])
+			# collect = 'Collect: '+str(move_idd.name)
+			# refund = 'Refund: '+str(move_idd.name)
+			collect = 'Additional: '+str(self.expense_prepaid_ids.voucher_no)
+			refund = 'Refund: '+str(self.expense_prepaid_ids.voucher_no)
+			journal_idd = self.env['account.journal'].search([('code','=','JV')])
+			print('Adjustment Journal.................',journal_idd)
+			for expense in self:
+				if not expense.date:
+					raise UserError(_('You must choose close date!'))
+				acc_date = expense.date
+				diff_amount = expense.advance_amount - expense.amount
+				#print "Different", diff_amount
+				if diff_amount != 0:
+					journal = expense.state_type
+					journal_dict.setdefault(journal, [])
+					journal_dict[journal].append(expense)
+					#print journal_dict.items()
 					#create the move that will contain the accounting entries
-					for expense in expense_list:
-						#print 'CLOSING LIST'
-						#company_currency = expense.company_id.currency_id
-						#diff_currency_p = expense.currency_id != company_currency
-						
-						move_lines = expense._finish_line_get()
-						#print "LOOK!!---------------------"
-						#print move_lines
-						# if self.currency_id != company_scurrency:
-						#     total_currency = self.currency_id.with_context(date=date_post or fields.Date.context_today(self)).compute(expense.amount_total, company_currency)
-						
+					exp = expense.amount
+					adv = expense.advance_amount
+					if adv < exp:
+						move = self.env['account.move'].create({
+							'journal_id': journal_idd.id,
+							'company_id': self.env.user.company_id.id,
+							'date': acc_date,
+							'ref': collect,
+							'name': '/',
+						})
+						print (collect,'........... if condition')
+					else:
+						move = self.env['account.move'].create({
+							'journal_id': journal.id,
+							'company_id': self.env.user.company_id.id,
+							'date': acc_date,
+							'ref': refund,
+							'name': '/',
+						})
+						print (refund,'........... else condition')
 
-						aid = expense.expense_prepaid_ids.account_ids if diff_amount > 0 else expense.expense_prepaid_ids.cash_account
-						amount = diff_amount if diff_amount < 0 else diff_amount * (-1)
-						# if diff_amount < 0 and not expense.state_type.default_credit_account_id:
-						#     raise UserError(_("No debit account found for the %s journal, please configure one.") % (expense.state_type.name))
-						
-						move_lines.append({
-								'type': 'dest',
-								'adj_exp_id': expense.expense_prepaid_ids.id,
-								'name': expense.expense_prepaid_ids.voucher_no or expense.employee_id.name,
-								'price': amount,
-								'quantity': 1,
-								'account_id': aid.id,
-								'date_maturity': expense.date,
-								'amount_currency': 0,
-								'currency_id': False,
-							})
-						lines = list(map(lambda x:(0, 0, expense._prepare_move_line_adjustment(x)), move_lines))
-						move.with_context(dont_create_taxes=True).write({'line_ids': lines})
-						move.post()
-						expense.expense_prepaid_ids.write({'adjustment_journal':move.id})
-					print ('------------------------------close expense ----------------------------')
-				#print move_lines
+					for journal, expense_list in journal_dict.items():
+						#print "CLOSING"
+						#create the move that will contain the accounting entries
+						for expense in expense_list:
+							#print 'CLOSING LIST'
+							#company_currency = expense.company_id.currency_id
+							#diff_currency_p = expense.currency_id != company_currency
+							
+							move_lines = expense._finish_line_get()
+							#print "LOOK!!---------------------"
+							#print move_lines
+							# if self.currency_id != company_scurrency:
+							#     total_currency = self.currency_id.with_context(date=date_post or fields.Date.context_today(self)).compute(expense.amount_total, company_currency)
+							
 
-				#convert eml into an osv-valid format
-				
+							aid = expense.expense_prepaid_ids.account_ids if diff_amount > 0 else expense.expense_prepaid_ids.cash_account
+							amount = diff_amount if diff_amount < 0 else diff_amount * (-1)
+							# if diff_amount < 0 and not expense.state_type.default_credit_account_id:
+							#     raise UserError(_("No debit account found for the %s journal, please configure one.") % (expense.state_type.name))
+							
+							move_lines.append({
+									'type': 'dest',
+									'adj_exp_id': expense.expense_prepaid_ids.id,
+									'name': expense.expense_prepaid_ids.voucher_no or expense.employee_id.name,
+									'price': amount,
+									'quantity': 1,
+									'account_id': aid.id,
+									'date_maturity': expense.date,
+									'amount_currency': 0,
+									'currency_id': False,
+								})
+							lines = list(map(lambda x:(0, 0, expense._prepare_move_line_adjustment(x)), move_lines))
+							move.with_context(dont_create_taxes=True).write({'line_ids': lines})
+							move.post()
+							expense.expense_prepaid_ids.write({'adjustment_journal':move.id})
+						print ('------------------------------close expense ----------------------------')
+					#print move_lines
+
+					#convert eml into an osv-valid format
+		else:
+			print('..........///////////////// close_expenses.......... else condition')
+			journal_dict = {}
+			move_line_idd = self.env['account.move.line'].search([('general_exp_id','=',self.expense_prepaid_ids.id)])
+			move_idd = self.env['account.move'].search([('id','=',move_line_idd.move_id.id)])
+			# collect = 'Collect: '+str(move_idd.name)
+			# refund = 'Refund: '+str(move_idd.name)
+			collect = 'Additional: '+str(self.expense_prepaid_ids.voucher_no)
+			refund = 'Refund: '+str(self.expense_prepaid_ids.voucher_no)
+			journal_idd = self.env['account.journal'].search([('code','=','JV')])
+			journal_csh = self.env['account.account'].search([('name','=','Cash')])
+			line_ids = self.env['hr.expense.line'].search([('expense_id','=',self.ids)])
+			print('Adjustment Journal.................',journal_idd,' and cash journal = ',journal_csh)
+			for expense in self:
+				if not expense.date:
+					raise UserError(_('You must choose close date!'))
+				acc_date = expense.date
+				diff_amount = expense.advance_amount - expense.amount
+				#print "Different", diff_amount
+				if diff_amount != 0:
+					journal = expense.state_type
+					journal_dict.setdefault(journal, [])
+					journal_dict[journal].append(expense)
+					#print journal_dict.items()
+					#create the move that will contain the accounting entries
+					exp = expense.amount
+					adv = expense.advance_amount
+					if adv < exp:
+						move = self.env['account.move'].create({
+							'journal_id': journal_idd.id,
+							'company_id': self.env.user.company_id.id,
+							'date': acc_date,
+							'ref': collect,
+							'name': '/',
+						})
+						print (collect,'........... if condition')
+					else:
+						move = self.env['account.move'].create({
+							'journal_id': journal.id,
+							'company_id': self.env.user.company_id.id,
+							'date': acc_date,
+							'ref': refund,
+							'name': '/',
+						})
+						print (refund,'........... else condition')
+
+					for journal, expense_list in journal_dict.items():
+						#print "CLOSING"
+						#create the move that will contain the accounting entries
+						for expense in expense_list:
+							#print 'CLOSING LIST'
+							#company_currency = expense.company_id.currency_id
+							#diff_currency_p = expense.currency_id != company_currency
+							
+							move_lines = expense._finish_line_get()
+							#print "LOOK!!---------------------"
+							#print move_lines
+							# if self.currency_id != company_scurrency:
+							#     total_currency = self.currency_id.with_context(date=date_post or fields.Date.context_today(self)).compute(expense.amount_total, company_currency)
+							if adv < amount:
+								aid = journal_csh
+							else:
+								aid = line_ids.account_ids
+								
+							# aid = journal_csh if diff_amount > 0 else line_ids.account_ids
+							# aid = expense.expense_prepaid_ids.account_ids if diff_amount > 0 else expense.expense_prepaid_ids.cash_account
+							amount = diff_amount if diff_amount < 0 else diff_amount * (-1)
+							# if diff_amount < 0 and not expense.state_type.default_credit_account_id:
+							#     raise UserError(_("No debit account found for the %s journal, please configure one.") % (expense.state_type.name))
+							
+							move_lines.append({
+									'type': 'dest',
+									'adj_exp_id': expense.expense_prepaid_ids.id,
+									'name': expense.expense_prepaid_ids.voucher_no or expense.employee_id.name,
+									'price': amount,
+									'quantity': 1,
+									'account_id': aid.id,
+									'date_maturity': expense.date,
+									'amount_currency': 0,
+									'currency_id': False,
+								})
+							lines = list(map(lambda x:(0, 0, expense._prepare_move_line_adjustment(x)), move_lines))
+							move.with_context(dont_create_taxes=True).write({'line_ids': lines})
+							move.post()
+							expense.expense_prepaid_ids.write({'adjustment_journal':move.id})
+
 		return True
 
 	def exchange_gain_loss_expenses(self):
 	#print "-------------------CLOSE EXPENSE--------------------------"
 		journal_dict = {}
+		line_ids = self.env['hr.expense.line'].search([('expense_id','=',self.ids)])
 		for expense in self:
 			if not expense.date:
 				raise UserError(_('You must choose close date!'))
@@ -743,7 +918,10 @@ class hr_general_expense(models.Model):
 							# if self.currency_id != company_scurrency:
 							#     total_currency = self.currency_id.with_context(date=date_post or fields.Date.context_today(self)).compute(expense.amount_total, company_currency)
 							
-
+							# if adv < amount:
+							# 	aid = journal_csh
+							# else:
+							# 	aid = line_ids.account_ids
 							aid = expense.expense_prepaid_ids.account_ids if diff_amount > 0 else expense.company_id.currency_exchange_journal_id.default_debit_account_id
 							print(aid,'---------------------- second time ------------------------->>')
 							amount = diff_amount if diff_amount < 0 else diff_amount * (-1)

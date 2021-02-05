@@ -18,13 +18,14 @@
 
 						<button name="prepaid_expense_confirm" string="Confirm" type="object" class="oe_highlight" states="draft" />
 
-						<button name="prepaid_expense_manager_accept" string="Manager Approved" type="object" class="oe_highlight" attrs="{'invisible':['|', ('is_approve', '=', False)]}" states="confirm" />
+						<button name="prepaid_expense_manager_accept" string="Manager Approved" type="object" class="oe_highlight" attrs="{'invisible': [('is_approve', '=', False)]}" groups="petty_cash_expense_extension.group_petty_manager,petty_cash_expense_extension.group_petty_admin" states="confirm" />
 
-						<button name="approve" states="manager_approve" string="Finance Approve" type="object" attrs="{'invisible':['|', ('is_approve_finance', '=', False)]}" class="oe_highlight"/>
+						<button name="approve" states="manager_approve" string="Finance Approve" type="object" attrs="{'invisible': [('is_approve_finance', '=', False)]}" groups="petty_cash_expense_extension.group_petty_finance,petty_cash_expense_extension.group_petty_admin" class="oe_highlight"/>
+						 
 
-						<button name="gm_approve" states="approve" string="GM Approve" type="object" groups="petty_cash_expense_extension.group_petty_gm,petty_cash_expense_extension.group_petty_admin" class="oe_highlight"/>
+						<button name="gm_approve" states="approve" string="GM Approve" groups="petty_cash_expense_extension.group_petty_finance,petty_cash_expense_extension.group_petty_gm,petty_cash_expense_extension.group_petty_admin" type="object"  class="oe_highlight"/>
 
-						<button name="prepaid_expense_paid" states="approve" string="Paid" type="object" groups="petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" class="oe_highlight"/>
+						<button name="prepaid_expense_paid" states="gm_approve" string="Paid" type="object" groups="petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" class="oe_highlight"/>
 						
 						<button name="prepaid_expense_cashier_closed" states="paid" string="Close" type="object" class="oe_highlight"/>
 
@@ -53,8 +54,8 @@
 								<field name="department_id" attrs="{'readonly': [('state', 'not in', ('draft','confirm'))]}" />
 								<field name="approved_by_id" attrs="{'readonly': [('state', 'not in', ('draft','confirm'))]}"/>
 								<field name="finance_approved_id" attrs="{'readonly': [('state', 'not in', ('draft','confirm'))]}"/>
-								<field name="account_ids"  attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin"/>
-								<field name="account_code" readonly="1" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin"/>	
+								<!-- <field name="account_ids"  attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_manager,petty_cash_expense_extension.group_petty_finance,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin"/> -->
+								<field name="account_code" readonly="1" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_manager,petty_cash_expense_extension.group_petty_finance,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin"/>	
 								<!-- 20190524 by yma							 -->
 								<field name="analytic_id" attrs="{'readonly': [('state', '!=', 'draft')]}" invisible='1' />							
 							</group>
@@ -62,8 +63,8 @@
 								<!-- Update By TPS 21-6-2019 -->
 								<field name="company_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
 								<field name="invoice_date" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
-								<field name="state_type" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" />
-								<field name="cash_account" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" />
+								<field name="state_type" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_manager,petty_cash_expense_extension.group_petty_finance,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" />
+								<field name="cash_account" attrs="{'invisible':[('state','=','draft')]}" groups="petty_cash_expense_extension.group_petty_manager,petty_cash_expense_extension.group_petty_finance,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin" />
 								<field name="currency_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
 								<field name="advance_amount" string ="Amount" attrs="{'readonly':[('state','!=','draft')]}"/>
 							</group>
@@ -116,7 +117,11 @@
 						
 
 					</sheet>
-
+					<div class="oe_chatter">
+						<field name="message_follower_ids" widget="mail_followers" groups="base.group_user"/>
+						<field name="activity_ids" widget="mail_activity"/>
+						<field name="message_ids" widget="mail_thread"/>
+					</div>
 				</form>
 			</field>
 		</record>
@@ -290,7 +295,7 @@
 		<menuitem action="general_expense_all" id="general_expense" name="Advance Clearing" parent="hr_expense.menu_hr_expense_my_expenses" sequence="2" groups="base.group_user" />
 		<!-- <menuitem action="hr_expense.hr_expense_actions_all" id="hr_travel_expense_menu" name="Travel Expenses" parent="hr_expense_menu" sequence="2" /> -->
 		<menuitem id="menu_hr_expense_prepaid_record" name="Advance Request" action="action_hr_expense_prepaid_record" parent="hr_expense.menu_hr_expense_my_expenses" sequence="1" groups="base.group_user"/>
-			<!-- petty_cash_expense_extension.group_petty_user,petty_cash_expense_extension.group_petty_approver,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin -->
+			<!-- petty_cash_expense_extension.group_petty_user,petty_cash_expense_extension.group_petty_manager,petty_cash_expense_extension.group_petty_finance,petty_cash_expense_extension.group_petty_cashier,petty_cash_expense_extension.group_petty_admin -->
 			<!-- group_petty_user,group_petty_approver,group_petty_cashier,group_petty_admin -->
 		
 		<menuitem id="hr_expense.menu_hr_expense_configuration" name="Configuration" parent='hr_expense.menu_hr_expense_root' sequence="15" />

@@ -106,6 +106,11 @@
 							</page>
 						</notebook>
 					</sheet>
+					<div class="oe_chatter">
+						<field name="message_follower_ids" widget="mail_followers" groups="base.group_user"/>
+						<field name="activity_ids" widget="mail_activity"/>
+						<field name="message_ids" widget="mail_thread"/>
+					</div>
 				</form>
 			</field>
 		</record>
@@ -202,7 +207,7 @@
 
 		<menuitem id="petty_cash_request_menu" name="Petty Cash Requests" parent="hr_expense.menu_hr_expense_my_expenses" action="action_petty_cash_request" sequence="3" />
 
-		<!-- <menuitem id="cash_advance_request_menu" name="Cash Advance Requests" parent="hr_expense.menu_hr_expense_my_expenses" action="action_cash_advance_request" sequence="2" groups="petty_cash_expense_extension.group_petty_user,petty_cash_expense_extension.group_petty_approver" /> -->
+		<!-- <menuitem id="cash_advance_request_menu" name="Cash Advance Requests" parent="hr_expense.menu_hr_expense_my_expenses" action="action_cash_advance_request" sequence="2" groups="petty_cash_expense_extension.group_petty_user,petty_cash_expense_extension.group_petty_manager,petty_cash_expense_extension.group_petty_finance" /> -->
 
 		<!-- <menuitem id="hr_expense.menu_hr_expense_my_expenses_to_submit" name="My Cash Advance Expenses" sequence="3" parent="hr_expense.menu_hr_expense_my_expenses" action="hr_expense_actions_my_unsubmitted"/> -->
 

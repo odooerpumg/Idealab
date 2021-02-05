@@ -16,6 +16,7 @@ import locale
 
 class AccountTransfer(models.Model):
 	_name = 'account.transfer'
+	_inherit = ['mail.thread', 'mail.activity.mixin']
 	_order = "transfer_date desc, name desc"
 
 	def employee_get(self):        
@@ -28,10 +29,10 @@ class AccountTransfer(models.Model):
 			return ids[0]
 		return False
 
-	name = fields.Char('Reference',states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]})
-	employee_name = fields.Many2one('hr.employee', 'Employee', default=employee_get, domain="[('active','=',True)]", required=True)
-	from_account_id = fields.Many2one('account.account',string='From Account',required=True)
-	to_account_id = fields.Many2one('account.account',string='To Account',required=True)
+	name = fields.Char('Reference',states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]},tracking=True)
+	employee_name = fields.Many2one('hr.employee', 'Employee', default=employee_get, domain="[('active','=',True)]", required=True,tracking=True)
+	from_account_id = fields.Many2one('account.account',string='From Account',required=True,tracking=True)
+	to_account_id = fields.Many2one('account.account',string='To Account',required=True,tracking=True)
 	transfer_date = fields.Date('Transfer Date', default=fields.date.today())
 	paid_ref = fields.Char('Paid Ref', states={'paid':[('readonly', True)], 'closed':[('readonly', True)]})
 	finance_approved_id = fields.Many2one('hr.employee',string='Finance Approved', domain="[('department_id','=','Finance&Account')]", required=True)
@@ -44,8 +45,8 @@ class AccountTransfer(models.Model):
 		('closed', 'Close'),
 		('cancel','Cancel')
 		],
-		'Status',default="draft")
-	amount = fields.Float('Amount')
+		'Status',default="draft",tracking=True)
+	amount = fields.Float('Amount',tracking=True)
 	fees = fields.Float('Transfer Fees')
 	state_type = fields.Many2one('account.journal', string='Journal')
 	currency_id = fields.Many2one('res.currency', 'Currency', default=119,required=True, readonly=True)
@@ -56,6 +57,10 @@ class AccountTransfer(models.Model):
 	product_id = fields.Many2many('product.product', 'transfer_product_rel', 'transfer_id', 'product_id',string='Product')
 	line_ids = fields.One2many('account.transfer.line', 'transfer_id', 'Account Transfer Lines')
 
+	@api.model
+	def _needaction_domain_get(self):
+		return [('needaction', '=', True)]
+		
 	def get_sequence(self):
 	  return self.env['ir.sequence'].next_by_code('account.transfer')
 
@@ -80,9 +85,39 @@ class AccountTransfer(models.Model):
 		self.write({'state': 'draft'})
 
 	def confirm(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','account.transfer')])
+		ids = self.finance_approved_id.user_id
+		date = self.transfer_date
+		name = self.name
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
+		# print('............... mail.activity created',mail_ids)
 		self.write({'state': 'confirm'})
 
 	def finance_approve(self):
+		mail_ids = self.env['mail.activity']
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		mail_s = mail_ids.search([('res_model','=','account.transfer'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
 		self.write({'state': 'finance_approve'})
 
 	def closed(self):

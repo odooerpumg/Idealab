@@ -21,7 +21,8 @@ class ProductProduct(models.Model):
 
 class Expense_Prepaid(models.Model):
 	_name = 'advance.claim'
-	_inherit = 'mail.thread'
+	_inherit = ['mail.thread', 'mail.activity.mixin']
+	_description = 'Claim Request'
 	_order = "invoice_date desc, voucher_no desc"
 
 
@@ -41,7 +42,7 @@ class Expense_Prepaid(models.Model):
 		('paid', 'Paid'),
 		('closed', 'Close'),
 		],
-		'Status',default="draft")
+		'Status',default="draft",tracking=True)
 
 	def employee_get(self):        
 		emp_id = self.env.context.get('default_employee_name', False)
@@ -56,19 +57,19 @@ class Expense_Prepaid(models.Model):
 	account_ids = fields.Many2one('account.account', 'Advanced Account Name')
 	account_code = fields.Char(related = 'account_ids.code',string='Advanced Account Code')
 	name_reference = fields.Char('Reference', required=True)
-	voucher_no = fields.Char(string='Invoice No',states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]}, copy=False,track_visibility='onchange')
-	invoice_date = fields.Date('Date', default=get_today, required=True,track_visibility='onchange')
-	employee_name = fields.Many2one('hr.employee', 'Employee', default=employee_get, domain="[('active','=',True)]", required=True,track_visibility='onchange')
+	voucher_no = fields.Char(string='Invoice No',states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]}, copy=False,tracking=True)
+	invoice_date = fields.Date('Date', default=get_today, required=True,tracking=True)
+	employee_name = fields.Many2one('hr.employee', 'Employee', default=employee_get, domain="[('active','=',True)]", required=True,tracking=True)
 	department_id = fields.Many2one('hr.department','Department')
-	advance_amount = fields.Float('Advanced Amount',track_visibility='onchange')
-	manager_approve_date = fields.Date('Manager Approve Date',default=fields.date.today() , states={'manager_approve':[('required', True)]},track_visibility='onchange')
+	advance_amount = fields.Float('Advanced Amount',tracking=True)
+	manager_approve_date = fields.Date('Manager Approve Date',default=fields.date.today() , states={'manager_approve':[('required', True)]})
 	# finance_approve_date = fields.Date('Finance Approve Date')
 	# next_approval_person = fields.Many2one('hr.employee','Next Approveal Person')
-	expense_total = fields.Float('Expenses Total',track_visibility='onchange')
+	expense_total = fields.Float('Expenses Total',tracking=True)
 	chart_of_account = fields.Many2one('account.account','Chart of Account')
 	currency_id = fields.Many2one('res.currency', 'Currency',required=True, default=119, readonly=True, states={'draft':[('readonly',False)],'cancelled':[('readonly',False)]})
 	account_name = fields.Char(' ')
-	state_type = fields.Many2one('account.journal', string='Journal',required=True)
+	state_type = fields.Many2one('account.journal', string='Journal',required=True,store=True)
 	cash_account = fields.Many2one('account.account','Paid By',domain=[('user_type_id','=','Bank and Cash')])
 	move_line_ids = fields.One2many('account.move.line', 'adv_claim_id', string='Journal Advance Claim', store=True)
 	# exp_move_line_ids = fields.One2many('account.move.line', 'exp_exp_id', string='Journal Expense', store=True)
@@ -103,7 +104,7 @@ class Expense_Prepaid(models.Model):
 	is_approve = fields.Boolean('Is Approve Manager ?',compute='get_approve',default=False)
 	is_approve_finance = fields.Boolean('Is Approve Finance ?',compute='get_approve',default=False)
 	is_user = fields.Boolean('Is User',compute='get_approve',default=False)
-	user_id = fields.Many2one('res.users','User', default=lambda self: self.env.user,track_visibility='onchange')
+	user_id = fields.Many2one('res.users','User', default=lambda self: self.env.user,tracking=True)
 	is_cashier = fields.Boolean('Is Cashier',compute='get_approve', default=False)
 
 	def get_approve(self):
@@ -139,17 +140,19 @@ class Expense_Prepaid(models.Model):
 
 	def get_sequence(self):
 	# 11-01-2021 by M2h ********************************************8
-	  sequence = self.env['ir.sequence'].next_by_code('advance.claim')
-	  journal_ids = self.env['account.journal'].search([('id','=',self.state_type.id)])
-	  code = journal_ids.state_type.code
-	  print('...........>>>>>>>>>>>>>>>>>>>>>>>>>>>>> code = ',code,' and journal = ',journal_ids)
-	  year = datetime.now().year
-	  month = datetime.now().month
-	  if month < 10:
-	  	month = '0'+str(month)
-	  seq_no = str(self.env.user.company_id.code)+'-'+str(code)+'-'+str(year)+'-'+str(month)+sequence
-	  print('....................... sequence no is = ',str(seq_no))
-	  return seq_no
+		sequence = self.env['ir.sequence'].next_by_code('advance.claim')
+		journal = self.state_type.id
+		print('.......>>>>>>>>>>>>.--------------- CHOOSE JOURNAL ',journal)
+		journal_ids = self.env['account.journal'].search([('id','=',journal)])
+		code = journal_ids.code
+		print('...........>>>>>>>>>>>>>>>>>>>>>>>>>>>>> code = ',code,' and journal = ',journal_ids)
+		year = datetime.now().year
+		month = datetime.now().month
+		if month < 10:
+			month = '0'+str(month)
+		seq_no = str(self.env.user.company_id.code)+'-'+str(code)+'-'+str(year)+'-'+str(month)+sequence
+		print('....................... sequence no is = ',str(seq_no))
+		return seq_no
 
 	@api.onchange('employee_name')
 	def onchange_employee(self):
@@ -370,7 +373,7 @@ class Expense_Prepaid(models.Model):
 
 	@api.model
 	def create(self, data):
-		data['voucher_no'] = self.get_sequence()
+		# data['voucher_no'] = self.get_sequence()
 		record_id = super(Expense_Prepaid, self).create(data)
 		return record_id
 
@@ -395,6 +398,27 @@ class Expense_Prepaid(models.Model):
 		return recs.name_get()
 
 	def advance_claim_confirm(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','advance.claim')])
+		ids = self.approved_by_id.user_id
+		date = self.invoice_date
+		name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
+		# print('............... mail.activity created',mail_ids)
 		return self.write({'state': 'confirm'})
 
 	# def md_approved(self):
@@ -409,12 +433,70 @@ class Expense_Prepaid(models.Model):
 	######## Line Manager #########
 
 	def advance_claim_manager_accept(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','advance.claim')])
+		ids = self.finance_approved_id.user_id
+		date = self.invoice_date
+		name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		mail_s = mail_ids.search([('res_model','=','advance.claim'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
+		# print('............... mail.activity created',mail_ids)
 		return self.write({'state': 'manager_approve'})
 
 	def approve(self):
+		mail_ids = self.env['mail.activity']
+		# model_ids = self.env['ir.model'].search([('model','=','advance.claim')])
+		# ids = self.env['hr.employee'].search([('is_gm','=',True)])
+		# ids = self.finance_approved_id.user_id
+		# date = self.invoice_date
+		# name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		mail_s = mail_ids.search([('res_model','=','advance.claim'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
+		# value = {
+		# 		'activity_type_id': 4,
+		# 		'date_deadline': date,
+		# 		'user_id': ids.user_id.id,
+		# 		'res_model_id': model_ids.id,
+		# 		'res_name': name,
+		# 		'res_id': cc,
+		# }
+		# mail_ids.create(value)
+		# print('............... mail.activity created',mail_ids)
 		return self.write({'state': 'approve'})
 
 	def gm_approve(self):
+		# mail_ids = self.env['mail.activity']
+		# dd = self.ids
+		# cc = ''
+		# for d in dd:
+		# 	cc += str(d)
+		# cc = int(cc)
+		# mail_s = mail_ids.search([('res_model','=','advance.claim'),('res_id','=',cc)])
+		# # print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		# mail_s.unlink()
 		return self.write({'state': 'gm_approve'})
 
 	# @api.one

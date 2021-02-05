@@ -16,6 +16,8 @@ import locale
 
 class PettyCashExpense(models.Model):
 	_name = 'petty.cash.expense'
+	_inherit = ['mail.thread', 'mail.activity.mixin']
+	_description = 'Petty Cash Request'
 
 	# @api.model
 	# def action_request(self):
@@ -36,16 +38,16 @@ class PettyCashExpense(models.Model):
 			return ids[0]
 		return False
 
-	name = fields.Char('Description')
-	requested_by_id = fields.Many2one('hr.employee',string='Requested By', default=employee_get, required=True)
+	name = fields.Char('Description',tracking=True)
+	requested_by_id = fields.Many2one('hr.employee',string='Requested By', default=employee_get, required=True,tracking=True)
 	approved_by_id = fields.Many2one('hr.employee',string='Approved By Manager', required=True)
 	finance_approved_id = fields.Many2one('hr.employee',string='Finance Approved', domain="[('department_id','=','Finance&Account')]", required=True)
-	amount = fields.Float('Amount')
+	amount = fields.Float('Amount',tracking=True)
 	description = fields.Text('Description')
 	request_journal_id = fields.Many2one('account.journal',string="To", required=True) 
 	payment_journal_id = fields.Many2one('account.journal',string="Payment Journal") 
-	date_requested = fields.Date('Date Requested', default=fields.Date.today)
-	date_received = fields.Date('Date Received')
+	date_requested = fields.Date('Date Requested', default=fields.Date.today,tracking=True)
+	date_received = fields.Date('Date Received',tracking=True)
 	payment_line_ids = fields.One2many('account.payment','petty_cash_id',string='Payment Line')
 	move_line_ids = fields.One2many('account.move.line','petty_cash_id',string='Move Line')
 	account_ids = fields.Many2one('account.account',string='Account')
@@ -60,7 +62,7 @@ class PettyCashExpense(models.Model):
 		('gm_approve', 'GM Approved'),
 		('refuse', 'Refused'),
 		('cancel', 'Cancel')
-		], string='Status', readonly=True, track_visibility='onchange', copy=False, default='draft')
+		], string='Status', readonly=True,tracking=True, copy=False, default='draft')
 	is_approve = fields.Boolean('Is Approve Manager ?',compute='get_approve',default=False)
 	is_approve_finance = fields.Boolean('Is Approve Finance ?',compute='get_approve',default=False)
 
@@ -82,9 +84,52 @@ class PettyCashExpense(models.Model):
 		self.write({'state': 'draft'})
 
 	def request(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','petty.cash.expense')])
+		ids = self.approved_by_id.user_id
+		date = self.date_requested
+		name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
 		self.write({'state': 'request'})
 
 	def manager_validate(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','petty.cash.expense')])
+		ids = self.finance_approved_id.user_id
+		date = self.date_requested
+		name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		mail_s = mail_ids.search([('res_model','=','petty.cash.expense'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
 		self.write({'state': 'manager_validate'})
 
 	def validate(self):
@@ -113,9 +158,42 @@ class PettyCashExpense(models.Model):
 			}
 			aa = payment_obj.create(payment_value)
 			aa.post()
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','petty.cash.expense')])
+		ids = self.env['hr.employee'].search([('is_gm','=',True)])
+		# ids = self.finance_approved_id.user_id
+		date = self.date_requested
+		name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		mail_s = mail_ids.search([('res_model','=','petty.cash.expense'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.user_id.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
 		return self.write({'state': 'validate'})
 		
 	def gm_approve(self):
+		mail_ids = self.env['mail.activity']
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		mail_s = mail_ids.search([('res_model','=','petty.cash.expense'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
 		return self.write({'state': 'gm_approve'})
 
 	def refuse(self):

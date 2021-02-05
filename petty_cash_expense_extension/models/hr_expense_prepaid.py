@@ -32,8 +32,8 @@ class Expense_Prepaid_Account(models.Model):
 
 class Expense_Prepaid(models.Model):
 	_name = 'expense.prepaid'
-	_description = 'Expense Prepaid'
-	_inherit = 'mail.thread'
+	_inherit = ['mail.thread', 'mail.activity.mixin']
+	_description = 'Advance Request'
 	_order = "invoice_date desc, voucher_no desc"
 
 
@@ -63,7 +63,7 @@ class Expense_Prepaid(models.Model):
 		('paid', 'Paid'),
 		('closed', 'Close'),
 		],
-		'Status',default="draft")
+		'Status',default="draft",tracking=True)
 
 	def employee_get(self):        
 		emp_id = self.env.context.get('default_employee_name', False)
@@ -78,15 +78,15 @@ class Expense_Prepaid(models.Model):
 	account_ids = fields.Many2one('account.account', 'Advanced Account Name')
 	account_code = fields.Char(related = 'account_ids.code',string='Advanced Account Code')
 	name_reference = fields.Char('Reference', required=True)
-	voucher_no = fields.Char(string='Invoice No',states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]}, copy=False,track_visibility='onchange')
-	invoice_date = fields.Date('Date', default=get_today, required=True,track_visibility='onchange')
-	employee_name = fields.Many2one('hr.employee', 'Employee', default=employee_get, domain="[('active','=',True)]", required=True,track_visibility='onchange')
+	voucher_no = fields.Char(string='Invoice No',states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]}, copy=False,tracking=True)
+	invoice_date = fields.Date('Date', default=get_today, required=True,tracking=True)
+	employee_name = fields.Many2one('hr.employee', 'Employee', default=employee_get, domain="[('active','=',True)]", required=True,tracking=True)
 	department_id = fields.Many2one('hr.department','Department')
-	advance_amount = fields.Float('Advanced Amount',track_visibility='onchange')
-	manager_approve_date = fields.Date('Manager Approve Date',default=fields.date.today() , states={'manager_approve':[('required', True)]},track_visibility='onchange')
+	advance_amount = fields.Float('Advanced Amount',tracking=True)
+	manager_approve_date = fields.Date('Manager Approve Date',default=fields.date.today() , states={'manager_approve':[('required', True)]},tracking=True)
 	# finance_approve_date = fields.Date('Finance Approve Date')
 	# next_approval_person = fields.Many2one('hr.employee','Next Approveal Person')
-	expense_total = fields.Float('Expenses Total',track_visibility='onchange')
+	expense_total = fields.Float('Expenses Total',tracking=True)
 	chart_of_account = fields.Many2one('account.account','Chart of Account')
 	currency_id = fields.Many2one('res.currency', 'Currency',required=True, default=119, readonly=True, states={'draft':[('readonly',False)],'cancelled':[('readonly',False)]})
 	account_name = fields.Char(' ')
@@ -125,7 +125,7 @@ class Expense_Prepaid(models.Model):
 	is_approve = fields.Boolean('Is Approve Manager ?',compute='get_approve',default=False)
 	is_approve_finance = fields.Boolean('Is Approve Finance ?',compute='get_approve',default=False)
 	is_user = fields.Boolean('Is User',compute='get_approve',default=False)
-	user_id = fields.Many2one('res.users','User', default=lambda self: self.env.user,track_visibility='onchange')
+	user_id = fields.Many2one('res.users','User', default=lambda self: self.env.user,tracking=True)
 	is_cashier = fields.Boolean('Is Cashier',compute='get_approve', default=False)
 
 	def get_approve(self):
@@ -243,8 +243,12 @@ class Expense_Prepaid(models.Model):
 	def _prepare_move_line_value(self):
 		self.ensure_one()
 		aml_name = self.employee_name.name + ': ' + self.voucher_no.split('\n')[0][:64]
-		if not self.account_ids:
-			raise ValidationError('Define Advance Account')
+		# if not self.account_ids:
+		# 	raise ValidationError('Define Advance Account')
+		acc_ids = self.env['account.account'].search([('name','=','Advance By Employee')])
+		print('--------------------------------------- default acc ',acc_ids)
+		self.account_ids = acc_ids.id
+		self.account_code = acc_ids.code
 		move_line = {
 			'type': 'src',
 			'name': aml_name,
@@ -404,6 +408,27 @@ class Expense_Prepaid(models.Model):
 		return recs.name_get()
 
 	def prepaid_expense_confirm(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','expense.prepaid')])
+		ids = self.approved_by_id.user_id
+		date = self.invoice_date
+		name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
+		# print('............... mail.activity created',mail_ids)
 		return self.write({'state': 'confirm'})
 
 	# def md_approved(self):
@@ -418,12 +443,74 @@ class Expense_Prepaid(models.Model):
 	######## Line Manager #########
 
 	def prepaid_expense_manager_accept(self):
+		mail_ids = self.env['mail.activity']
+		model_ids = self.env['ir.model'].search([('model','=','expense.prepaid')])
+		ids = self.finance_approved_id.user_id
+		date = self.invoice_date
+		name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# print('........................................... id ',str(dd),' and cc ',cc)
+		mail_s = mail_ids.search([('res_model','=','expense.prepaid'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
+		value = {
+				'activity_type_id': 4,
+				'date_deadline': date,
+				'user_id': ids.id,
+				'res_model_id': model_ids.id,
+				'res_name': name,
+				'res_id': cc,
+		}
+		mail_ids.create(value)
+		self.is_approve = False
+		# print('............... mail.activity created',mail_ids)
 		return self.write({'state': 'manager_approve'})
 
 	def approve(self):
+		mail_ids = self.env['mail.activity']
+		# model_ids = self.env['ir.model'].search([('model','=','expense.prepaid')])
+		# ids = self.env['hr.employee'].search([('gm_id','=',self.employee_name.gm_id.id),('company_id','=',self.company_id.id),('is_gm','=',True)])
+		# print('......................... gm ',ids)
+		# uis = ids.search([('company_id','=',self.company_id.id)])
+		# print('.................... ids ',ids,' and uis ',uis)
+		# date = self.invoice_date
+		# name = self.voucher_no
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		# # print('........................................... id ',str(dd),' and cc ',cc)
+		mail_s = mail_ids.search([('res_model','=','expense.prepaid'),('res_id','=',cc)])
+		# # print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
+		# value = {
+		# 		'activity_type_id': 4,
+		# 		'date_deadline': date,
+		# 		'user_id': ids.id,
+		# 		'res_model_id': model_ids.id,
+		# 		'res_name': name,
+		# 		'res_id': cc,
+		# }
+		# mail_ids.create(value)
+		# print('............... mail.activity created',mail_ids)
+		self.is_approve_finance = False
 		return self.write({'state': 'approve'})
 
 	def gm_approve(self):
+		mail_ids = self.env['mail.activity']
+		dd = self.ids
+		cc = ''
+		for d in dd:
+			cc += str(d)
+		cc = int(cc)
+		mail_s = mail_ids.search([('res_model','=','expense.prepaid'),('res_id','=',cc)])
+		# print('>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<< +++++++++++++++  ',mail_s)
+		mail_s.unlink()
 		return self.write({'state': 'gm_approve'})
 
 	# @api.one
